@@ -1,107 +1,91 @@
 "use client";
 
-import Head from "next/head";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { toast } from "react-hot-toast";
+import { v4 as uuidv4 } from "uuid";
+import toast from "react-hot-toast";
+import { useSocket } from "@/context/socket";
 
-export default function Home() {
+const Home = () => {
   const router = useRouter();
+  const [roomId, setRoomId] = useState("");
+  const [username, setUsername] = useState("");
 
-  const [meetingCode, setMeetingCode] = useState("");
-  const [inputValue, setInputValue] = useState("");
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const socket = useSocket();
 
-  const openModal = () => {
-    const toastId = toast.loading("Generating meeting code...");
-    setTimeout(() => {
-      const code = Math.random().toString(36).slice(2);
-      setMeetingCode("lets-connect-" + code);
-      setIsModalOpen(true);
-      toast.dismiss(toastId);
-    }, 1000);
+  // console.log(socket);
+
+  const generateRoomId = () => {
+    const id = uuidv4();
+    setRoomId(id);
   };
 
-  const closeModal = () => {
-    setIsModalOpen(false);
+  useEffect(() => {
+    socket.on("joined-room", ({ roomId }) => {
+      router.push(`/room/${roomId}`);
+    });
+
+    return () => {
+      socket.on("joined-room", ({ roomId }) => {
+        router.push(`/room/${roomId}`);
+      });
+    };
+  }, [socket]);
+
+  const joinMeeting = () => {
+    socket.emit("join-room", { username, roomId });
   };
 
   const copyToClipboard = () => {
-    navigator.clipboard.writeText(meetingCode);
-    toast.success("Meeting code copied", {
-      duration: 1000,
+    navigator.clipboard.writeText(roomId).then(() => {
+      toast.success("Meeting ID copied to clipboard!");
     });
   };
 
-  const handleInputChange = (e) => {
-    setInputValue(e.target.value);
-  };
-
-  const handleJoinClick = (e) => {
-    e.preventDefault();
-
-    router.push(`/room/${inputValue}`);
-  };
-
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen py-2">
-      <Head>
-        <title>Meeting App</title>
-      </Head>
-
-      <div className="flex items-center space-x-4 mb-4">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100">
+      <div className="bg-white p-8 rounded-lg shadow-lg max-w-md w-full">
+        <h1 className="text-3xl font-bold mb-6 text-center">
+          Welcome to WebRTC Meeting
+        </h1>
         <button
-          onClick={openModal}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg"
+          onClick={generateRoomId}
+          className="w-full bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 transition mb-4"
         >
-          New Meeting
+          Generate Meeting ID
         </button>
-
-        <form onSubmit={handleJoinClick} className="flex space-x-4">
+        <div className="flex items-center mb-4">
           <input
             type="text"
-            placeholder="Enter a code or link"
-            value={inputValue}
-            onChange={handleInputChange}
-            className="px-3 py-2 border border-gray-300 rounded-md"
+            value={roomId}
+            onChange={(e) => setRoomId(e.target.value)}
+            className="flex-grow p-2 border rounded-lg text-black mr-2"
+            placeholder="Your Meeting ID will appear here"
           />
           <button
-            type="submit"
-            disabled={!inputValue}
-            className={`px-4 py-2 rounded-lg text-white ${
-              inputValue ? "bg-blue-600" : "bg-gray-400 cursor-not-allowed"
-            }`}
+            onClick={copyToClipboard}
+            className="bg-gray-500 text-white py-2 px-4 rounded-lg hover:bg-gray-600 transition"
+            disabled={!roomId}
           >
-            JOIN
+            Copy
           </button>
-        </form>
-      </div>
-
-      {isModalOpen && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm ">
-          <div className="bg-white p-6 rounded-lg shadow-lg">
-            <h2 className="text-lg font-semibold">Your Meeting Code</h2>
-            <input
-              type="text"
-              value={meetingCode}
-              readOnly
-              className="text-black mt-2 mb-4 w-full px-3 py-2 border border-gray-300 rounded-md"
-            />
-            <button
-              onClick={copyToClipboard}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg mr-2"
-            >
-              Copy Code
-            </button>
-            <button
-              onClick={closeModal}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg"
-            >
-              Close
-            </button>
-          </div>
         </div>
-      )}
+        <input
+          type="text"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          className="w-full p-2 border rounded-lg text-black mb-4"
+          placeholder="Enter your name here"
+        />
+        <button
+          onClick={joinMeeting}
+          className="w-full bg-green-500 text-white py-2 px-4 rounded-lg hover:bg-green-600 transition"
+        >
+          Join Meeting
+        </button>
+      </div>
     </div>
   );
-}
+};
+
+export default Home;
